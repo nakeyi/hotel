@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>查询报表</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/ui.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-wrap module-shell">
+  <div class="app-toolbar embed-hide module-toolbar">
+    <div>
+      <div class="app-title">查询报表</div>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="location.href='/dashboard'">返回工作台</button>
+  </div>
+
+  <div class="app-card mb-3">
+    <div class="card-body">
+      <div class="front-tab-row" id="reportTabs"></div>
+    </div>
+  </div>
+
+  <div class="app-card">
+    <div class="card-body">
+      <div class="module-card-title">
+        <div>
+          <div id="reportTitle" class="section-title mb-1"></div>
+          <div id="reportStatus" class="app-sub"></div>
+        </div>
+      </div>
+      <div id="reportFilters" class="row g-2 align-items-end mb-3"></div>
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <button class="btn btn-primary" onclick="loadCurrentReport()">查询</button>
+        <button class="btn btn-success" onclick="exportCurrentReport()">导出当前查询结果</button>
+      </div>
+      <div class="module-table-wrap">
+        <table class="table table-hover align-middle">
+          <thead id="th"></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const tabs = [
+  {
+    key: "rooms",
+    label: "查询客房信息",
+    title: "查询客房信息",
+    status: "",
+    endpoint: "/api/query/rooms",
+    exportUrl: "/api/export/query/rooms/excel",
+    fields: [
+      { name: "room_id", label: "房间号", type: "room_id" },
+      { name: "room_type", label: "房型", type: "room_type" },
+      { name: "status", label: "状态", type: "text" },
+      { name: "customer_name", label: "客户姓名", type: "text" },
+      { name: "customer_phone", label: "手机号", type: "text" },
+      { name: "checkout_date", label: "离店日期", type: "date" },
+      { name: "checkin_time", label: "入住时间", type: "date" }
+    ],
+    columns: [
+      ["room_id", "房间号"],
+      ["room_type", "房型"],
+      ["area", "面积"],
+      ["price", "价格"],
+      ["status", "状态"],
+      ["res_id", "预订ID"],
+      ["customer", "客户"],
+      ["phone", "手机号"],
+      ["checkin_time", "入住时间"],
+      ["checkout_date", "离店日期"],
+      ["operator", "操作人"]
+    ]
+  },
+  {
+    key: "reservations",
+    label: "查询入住记录",
+    title: "查询入住记录",
+    status: "",
+    endpoint: "/api/query/reservations",
+    exportUrl: "/api/export/query/reservations/excel",
+    fields: [
+      { name: "name", label: "客户姓名", type: "text" },
+      { name: "phone", label: "手机号", type: "text" },
+      { name: "checkin_date", label: "入住日期", type: "date" }
+    ],
+    columns: [
+      ["res_id", "预订ID"],
+      ["customer", "客户"],
+      ["reserve_phone", "手机号"],
+      ["room_id", "房间号"],
+      ["room_type", "房型"],
+      ["price", "房价"],
+      ["checkin_date", "入住日期"],
+      ["checkout_date", "离店日期"],
+      ["checkout_time", "退房时间"],
+      ["status", "状态"]
+    ]
+  },
+  {
+    key: "checkin",
+    label: "查询入住登记",
+    title: "查询入住登记",
+    status: "",
+    endpoint: "/api/query/checkin",
+    exportUrl: "/api/export/query/checkin/excel",
+    fields: [
+      { name: "name", label: "客户姓名", type: "text" },
+      { name: "phone", label: "手机号", type: "text" },
+    ],
+    columns: [
+      ["checkin_id", "入住ID"],
+      ["customer", "客户"],
+      ["phone", "手机号"],
+      ["room_id", "房间号"],
+      ["room_type", "房型"],
+      ["price", "房价"],
+      ["checkin_time", "入住时间"],
+      ["operator", "操作人"],
+      ["operator_user_id", "操作人ID"],
+      ["actual_checkout_time", "退房时间"]
+    ]
+  },
+  {
+    key: "checkout",
+    label: "查询退房信息",
+    title: "查询退房信息",
+    status: "",
+    endpoint: "/api/query/checkout",
+    exportUrl: "/api/export/query/checkout/excel",
+    fields: [
+      { name: "name", label: "客户姓名", type: "text" },
+      { name: "phone", label: "手机号", type: "text" },
+      { name: "checkout_date", label: "退房日期", type: "date" }
+    ],
+    columns: [
+      ["checkout_id", "退房ID"],
+      ["customer", "客户"],
+      ["phone", "手机号"],
+      ["room_id", "房间号"],
+      ["room_type", "房型"],
+      ["price", "房价"],
+      ["checkout_date", "退房日期"],
+      ["checkout_time", "退房时间"],
+      ["total_fee", "总费用"],
+      ["extra_fee", "额外费用"],
+      ["operator", "操作人"],
+      ["operator_user_id", "操作人ID"]
+    ]
+  },
+  {
+    key: "income",
+    label: "查询收入",
+    title: "查询收入",
+    status: "",
+    endpoint: "/api/query/income",
+    exportUrl: "/api/export/query/income/excel",
+    fields: [
+      { name: "year_month", label: "月份", type: "text" },
+      { name: "date", label: "具体日期", type: "date" }
+    ],
+    columns: [
+      ["period", "统计周期"],
+      ["total_income", "总收入"],
+      ["checkout_count", "退房单数"]
+    ]
+  }
+];
+
+const $ = id => document.getElementById(id);
+const state = { current: tabs[0], roomOptions: [], roomTypeOptions: [] };
+
+function buildTabs() {
+  $("reportTabs").innerHTML = tabs.map(t => `<button class="front-tab-btn" data-tab="${t.key}">${t.label}</button>`).join("");
+  document.querySelectorAll(".front-tab-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      state.current = tabs.find(t => t.key === btn.dataset.tab) || tabs[0];
+      await renderActiveTab();
+    });
+  });
+}
+
+function syncTabs() {
+  document.querySelectorAll(".front-tab-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === state.current.key));
+  $("reportTitle").textContent = state.current.title;
+  $("reportStatus").textContent = state.current.status;
+  document.title = state.current.title;
+}
+
+async function loadRoomFilterOptions() {
+  const [roomsResp, typesResp] = await Promise.all([
+    fetch("/api/rooms", { credentials: "include" }),
+    fetch("/api/room_types", { credentials: "include" })
+  ]);
+  if (roomsResp.status === 401 || roomsResp.status === 403 || typesResp.status === 401 || typesResp.status === 403) {
+    location.href = "/";
+    return false;
+  }
+  const rooms = await roomsResp.json();
+  const types = await typesResp.json();
+  state.roomOptions = Array.from(new Set((rooms || []).map(r => String(r.room_id)))).filter(Boolean);
+  state.roomTypeOptions = Array.from(new Set((types || []).map(t => String(t.name)))).filter(Boolean);
+  return true;
+}
+
+function renderFilters() {
+  $("reportFilters").innerHTML = state.current.fields.map(field => {
+    let inputHtml = "";
+    if (field.type === "room_id") {
+      inputHtml = `<select id="filter_${field.name}" class="form-select"><option value="">全部</option>${
+        state.roomOptions.map(v => `<option value="${v}">${v}</option>`).join("")
+      }</select>`;
+    } else if (field.type === "room_type") {
+      inputHtml = `<select id="filter_${field.name}" class="form-select"><option value="">全部</option>${
+        state.roomTypeOptions.map(v => `<option value="${v}">${v}</option>`).join("")
+      }</select>`;
+    } else {
+      const inputType = field.type === "date" ? "date" : "text";
+      inputHtml = `<input id="filter_${field.name}" class="form-control" type="${inputType}" placeholder="${field.label}">`;
+    }
+    return `
+      <div class="col-12 col-md-3">
+        <label class="tiny-label">${field.label}</label>
+        ${inputHtml}
+      </div>
+    `;
+  }).join("");
+}
+
+function collectFilters() {
+  const out = {};
+  state.current.fields.forEach(field => {
+    const el = $(`filter_${field.name}`);
+    out[field.name] = el ? el.value.trim() : "";
+  });
+  return out;
+}
+
+function formatCell(key, value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (key === "price" || key === "total_fee" || key === "extra_fee") {
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toFixed(2) : value;
+  }
+  return value;
+}
+
+function draw(rows) {
+  if (!rows || !rows.length) {
+    th.innerHTML = "";
+    tb.innerHTML = "";
+    return;
+  }
+  const columns = state.current.columns || [];
+  th.innerHTML = "<tr>" + columns.map(([, label]) => `<th>${label}</th>`).join("") + "</tr>";
+  tb.innerHTML = rows.map(r => "<tr>" + columns.map(([key]) => `<td>${formatCell(key, r[key])}</td>`).join("") + "</tr>").join("");
+}
+
+async function loadCurrentReport() {
+  const body = collectFilters();
+  const r = await fetch(state.current.endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (r.status === 401 || r.status === 403) {
+    location.href = "/";
+    return;
+  }
+  draw(d);
+}
+
+async function exportCurrentReport() {
+  const params = new URLSearchParams(collectFilters());
+  location.href = `${state.current.exportUrl}?${params.toString()}`;
+}
+
+async function renderActiveTab() {
+  syncTabs();
+  if (state.current.key === "rooms") {
+    const ok = await loadRoomFilterOptions();
+    if (!ok) return;
+  }
+  renderFilters();
+  await loadCurrentReport();
+}
+
+if (new URLSearchParams(location.search).get("embed") === "1") {
+  document.querySelector(".app-toolbar")?.classList.add("d-none");
+}
+
+buildTabs();
+renderActiveTab();
+</script>
+</body>
+</html>

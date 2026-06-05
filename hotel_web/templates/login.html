@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>酒店管理系统 - 登录</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/ui.css" rel="stylesheet">
+</head>
+<body>
+  <div class="login-shell login-shell-revamp">
+    <div class="login-shell-bg" aria-hidden="true">
+      <span class="login-orb login-orb-a"></span>
+      <span class="login-orb login-orb-b"></span>
+      <span class="login-orb login-orb-c"></span>
+      <span class="login-gridline"></span>
+    </div>
+    <div class="login-shell-grid app-wrap">
+      <section class="login-showcase login-enter login-enter-left">
+        <div class="login-mark">酒店工作台</div>
+        <h1 class="login-heading">酒店管理系统</h1>
+      </section>
+
+      <section class="login-panel login-enter login-enter-right">
+        <div class="login-card app-card">
+          <div class="card-body">
+            <div class="login-card-top">
+              <div>
+                <div class="login-card-kicker">安全入口</div>
+                <h2 class="login-card-title">登录</h2>
+              </div>
+              <div class="login-card-badge">受保护</div>
+            </div>
+
+            <form id="f" class="login-form">
+              <div class="login-field">
+                <label class="form-label">用户名</label>
+                <input id="u" class="form-control form-control-lg" maxlength="64" autocomplete="username" spellcheck="false" autocapitalize="off" required>
+              </div>
+              <div class="login-field">
+                <label class="form-label">密码</label>
+                <input id="p" type="password" class="form-control form-control-lg" maxlength="128" autocomplete="current-password" spellcheck="false" autocapitalize="off" required>
+              </div>
+              <button class="btn btn-primary btn-lg w-100" id="btn">登录</button>
+              <div id="msg" class="msg-line mt-3"></div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (window.gsap && !reduceMotion) {
+      gsap.set([".login-showcase", ".login-panel"], { willChange: "transform, opacity" });
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+      tl.from(".login-mark", { y: 14, opacity: 0, duration: 0.48 })
+        .from(".login-heading", { y: 28, opacity: 0, duration: 0.7 }, "-=0.24")
+        .from(".login-card", { x: 24, opacity: 0, scale: 0.985, duration: 0.7 }, "-=0.65")
+        .from(".login-field", { y: 12, opacity: 0, stagger: 0.08, duration: 0.42 }, "-=0.38")
+        .from(".btn-primary", { y: 10, opacity: 0, duration: 0.3 }, "-=0.15");
+
+      gsap.to(".login-orb-a", {
+        x: 18,
+        y: -16,
+        duration: 12,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+      });
+      gsap.to(".login-orb-b", {
+        x: -14,
+        y: 12,
+        duration: 15,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+      });
+      gsap.to(".login-orb-c", {
+        x: 10,
+        y: -12,
+        duration: 18,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+      });
+      gsap.to(".login-gridline", {
+        x: 120,
+        y: 48,
+        duration: 24,
+        repeat: -1,
+        ease: "none"
+      });
+    }
+
+    const f = document.getElementById("f");
+    const msg = document.getElementById("msg");
+    const btn = document.getElementById("btn");
+    const u = document.getElementById("u");
+    const p = document.getElementById("p");
+
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+      btn.disabled = true;
+      try {
+        const r = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ username: u.value.trim(), password: p.value })
+        });
+        const d = await r.json();
+        if (!d.success) {
+          msg.textContent = d.message || "登录失败";
+          msg.className = "msg-line mt-3 text-danger";
+          return;
+        }
+        location.href = "/dashboard";
+      } catch {
+        msg.textContent = "网络异常，请稍后重试";
+        msg.className = "msg-line mt-3 text-danger";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

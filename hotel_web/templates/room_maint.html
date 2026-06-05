@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>房间维护</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/ui.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-wrap module-shell">
+  <div class="app-toolbar embed-hide module-toolbar">
+    <div>
+      <div class="app-title">房间维护</div>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="location.href='/dashboard'">返回工作台</button>
+  </div>
+
+  <div class="module-grid">
+    <section class="module-main">
+      <div class="module-stack">
+        <div class="app-card">
+          <div class="card-body">
+            <div class="module-card-title">
+              <div>
+                <div class="section-title mb-1">房态概览</div>
+              </div>
+              <button class="btn btn-outline-primary btn-sm" onclick="loadRooms()">刷新房态</button>
+            </div>
+            <div class="module-kpi-row room-kpi-grid">
+              <div class="module-kpi"><span>总房间</span><strong id="kpiTotal">0</strong></div>
+              <div class="module-kpi"><span>空闲</span><strong id="kpiFree">0</strong></div>
+              <div class="module-kpi"><span>已入住</span><strong id="kpiBusy">0</strong></div>
+              <div class="module-kpi"><span>预订</span><strong id="kpiReserved">0</strong></div>
+              <div class="module-kpi"><span>维护/清洁</span><strong id="kpiOther">0</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-card">
+          <div class="card-body">
+            <div class="module-card-title">
+              <div>
+                <div class="section-title mb-1">房间列表</div>
+              </div>
+            </div>
+            <div class="module-table-wrap">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>房间</th>
+                    <th>类型</th>
+                    <th>面积</th>
+                    <th>价格</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="tb"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="module-side">
+      <div class="app-card mb-3">
+        <div class="card-body">
+          <div class="section-title">房间维护</div>
+        </div>
+      </div>
+      <div class="app-card">
+        <div class="card-body">
+          <div class="section-title">消息</div>
+          <div id="msg" class="msg-line"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="confirmActionModal" class="ui-modal d-none" aria-hidden="true">
+  <div class="ui-modal-backdrop" data-close="1"></div>
+  <div class="ui-modal-panel ui-modal-panel--compact ui-modal-panel--warning">
+    <div class="ui-modal-header">
+      <h5 id="confirmActionTitle" class="ui-modal-title">确认操作</h5>
+      <button class="btn btn-sm btn-outline-secondary" onclick="closeConfirmActionModal()">关闭</button>
+    </div>
+    <div id="confirmActionBody" class="ui-modal-body ui-modal-note ui-modal-lead"></div>
+    <div class="ui-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="closeConfirmActionModal()">取消</button>
+      <button id="confirmActionOkBtn" class="btn btn-warning">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const setMsg = t => $("msg").textContent = t || "";
+let currentUser = null;
+const maintenanceTypeByStatus = {
+  "维护中": "维护",
+  "清洁中": "清洁"
+};
+
+let confirmActionHandler = null;
+
+function openConfirmActionModal({ title, body, confirmText, confirmClass, onConfirm }) {
+  confirmActionHandler = typeof onConfirm === "function" ? onConfirm : null;
+  $("confirmActionTitle").textContent = title || "确认操作";
+  $("confirmActionBody").innerHTML = body || "";
+  const okBtn = $("confirmActionOkBtn");
+  okBtn.textContent = confirmText || "确认";
+  okBtn.className = `btn ${confirmClass || "btn-warning"}`;
+  okBtn.onclick = async () => {
+    const handler = confirmActionHandler;
+    closeConfirmActionModal();
+    if (handler) await handler();
+  };
+  $("confirmActionModal").classList.remove("d-none");
+}
+
+function closeConfirmActionModal() {
+  confirmActionHandler = null;
+  $("confirmActionModal").classList.add("d-none");
+}
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (r.status === 401 || r.status === 403) {
+    location.href = "/";
+    return null;
+  }
+  return d;
+}
+
+async function get(url) {
+  const r = await fetch(url, { credentials: "include" });
+  const d = await r.json();
+  if (r.status === 401 || r.status === 403) {
+    location.href = "/";
+    return null;
+  }
+  return d;
+}
+
+function renderKpis(rows) {
+  const data = rows || [];
+  const total = data.length;
+  const free = data.filter(r => r.status === "空闲").length;
+  const busy = data.filter(r => r.status === "已入住").length;
+  const reserved = data.filter(r => r.status === "预订").length;
+  const other = total - free - busy - reserved;
+  $("kpiTotal").textContent = total;
+  $("kpiFree").textContent = free;
+  $("kpiBusy").textContent = busy;
+  $("kpiReserved").textContent = reserved;
+  $("kpiOther").textContent = other < 0 ? 0 : other;
+}
+
+function rowAction(room) {
+  const canIdle = room.status === "维护中" || room.status === "清洁中";
+  return `
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-sm btn-outline-danger" onclick="confirmMaintain(${room.room_id}, '维护')">维护</button>
+      <button class="btn btn-sm btn-outline-success" onclick="confirmMaintain(${room.room_id}, '清洁')">清洁</button>
+      <button class="btn btn-sm btn-outline-primary" ${canIdle ? `onclick="confirmIdle(${room.room_id}, '${room.status}')"` : "disabled"}>空闲</button>
+    </div>
+  `;
+}
+
+function renderRooms(rows) {
+  $("tb").innerHTML = (rows || []).map(r => `
+    <tr>
+      <td>${r.room_id}</td>
+      <td>${r.room_type || ""}</td>
+      <td>${r.area ?? ""}</td>
+      <td>${Number(r.price || 0).toFixed(2)}</td>
+      <td>${r.status || ""}</td>
+      <td>${rowAction(r)}</td>
+    </tr>
+  `).join("");
+}
+
+async function loadRooms() {
+  const d = await get("/api/rooms");
+  if (!d) return;
+  renderKpis(d);
+  renderRooms(d);
+}
+
+async function confirmMaintain(roomId, recordType) {
+  openConfirmActionModal({
+    title: "确认维护操作",
+    body: `确认将房间 ${roomId} 标记为${recordType}吗？`,
+    confirmText: "确认",
+    confirmClass: "btn-danger",
+    onConfirm: async () => {
+      const d = await post("/api/maintenance", {
+        room_id: roomId,
+        record_type: recordType,
+        handler: (currentUser && currentUser.username) || "",
+        result: `前台${recordType}`,
+        remark: "房间维护页内操作"
+      });
+      if (!d) return;
+      setMsg(d.message);
+      await loadRooms();
+    }
+  });
+}
+
+async function confirmIdle(roomId, status) {
+  const recordType = maintenanceTypeByStatus[status];
+  if (!recordType) {
+    setMsg("当前房间不需要恢复空闲");
+    return;
+  }
+  openConfirmActionModal({
+    title: "确认恢复空闲",
+    body: `确认将房间 ${roomId} 恢复为空闲吗？`,
+    confirmText: "恢复",
+    confirmClass: "btn-primary",
+    onConfirm: async () => {
+      const d = await post("/api/maintenance/complete", {
+        room_id: roomId,
+        record_type: recordType
+      });
+      if (!d) return;
+      setMsg(d.message);
+      await loadRooms();
+    }
+  });
+}
+
+async function init() {
+  currentUser = await get("/api/current_user");
+  if (!currentUser) return;
+  await loadRooms();
+}
+
+if (new URLSearchParams(location.search).get("embed") === "1") {
+  document.querySelectorAll(".embed-hide").forEach(el => el.classList.add("d-none"));
+}
+
+init();
+</script>
+</body>
+</html>
