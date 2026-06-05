@@ -1,0 +1,18 @@
+# Python cache and bytecode
+__pycache__/
+*.pyc
+
+# Local environment and secrets
+hotel_web/.env
+hotel_web/secret.key
+
+# Runtime and session data
+hotel_web/cookie.txt
+hotel_web/runtime*.log
+hotel_web/flask_session/
+
+# Local virtual environment
+hotel_web/.venv/
+
+# Generated analysis artifacts
+hotel_web/.understand-anything/

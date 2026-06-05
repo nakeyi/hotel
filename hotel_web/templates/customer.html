@@ -1,0 +1,808 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>客户服务中心</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/ui.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-wrap customer-pc-shell">
+  <div class="app-toolbar customer-toolbar">
+    <div>
+      <div class="app-title">客户服务中心</div>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="logout()">退出登录</button>
+  </div>
+
+  <div class="customer-drawer-layout">
+    <aside class="app-card drawer-nav-card">
+      <div class="card-body p-2">
+        <button type="button" class="drawer-nav-btn active" data-target="panel-reserve">客房查询与预订</button>
+        <button type="button" class="drawer-nav-btn" data-target="panel-orders">我的订单</button>
+        <button type="button" class="drawer-nav-btn" data-target="panel-comment">评价 / 投诉 / 清洁</button>
+      </div>
+    </aside>
+
+    <section class="app-card drawer-content-card">
+      <div class="card-body">
+        <div class="drawer-panels">
+          <div id="panel-reserve" class="drawer-panel active">
+            <div class="sub-title">空闲客房筛选与查询</div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-3">
+                <label class="tiny-label">房间号</label>
+                <select id="room_id" class="form-select"><option value="">全部房间</option></select>
+              </div>
+              <div class="col-md-3">
+                <label class="tiny-label">房型</label>
+                <select id="room_type" class="form-select"><option value="">全部房型</option></select>
+              </div>
+              <div class="col-md-2">
+                <label class="tiny-label">最高价格</label>
+                <input id="price_max" class="form-control" placeholder="如 399">
+              </div>
+              <div class="col-md-2">
+                <label class="tiny-label">最小面积</label>
+                <input id="area_min" class="form-control" placeholder="如 25">
+              </div>
+              <div class="col-md-2 d-grid">
+                <label class="tiny-label">&nbsp;</label>
+                <button class="btn btn-primary" onclick="queryRooms()">查询空闲房</button>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-md-4">
+                <label class="tiny-label">入住日期</label>
+                <input id="date" type="date" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="tiny-label">离店日期</label>
+                <input id="checkout_date" type="date" class="form-control">
+              </div>
+              <div class="col-md-4 d-grid">
+                <label class="tiny-label">&nbsp;</label>
+                <button class="btn btn-outline-primary reset-filter-btn" onclick="resetFilters()">重置筛选条件</button>
+              </div>
+            </div>
+
+            <div id="roomList" class="room-list"></div>
+            <div id="roomEmpty" class="room-empty d-none">暂无符合条件的空闲房间。</div>
+          </div>
+
+          <div id="panel-orders" class="drawer-panel">
+            <div class="sub-title">我的订单</div>
+            <div id="orderList" class="order-list"></div>
+            <div id="orderEmpty" class="room-empty d-none">当前暂无订单记录。</div>
+          </div>
+
+          <div id="panel-comment" class="drawer-panel">
+            <div class="sub-title">评价 / 投诉 / 清洁</div>
+            <div class="request-grid">
+              <section class="request-card request-card-emphasis">
+                <div class="request-card-head">
+                  <div>
+                    <div class="request-title">评价 / 投诉</div>
+                  </div>
+                  <div class="request-badge">来源账号：<span id="comment_source">-</span></div>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-5">
+                    <label class="tiny-label">已入住房间号</label>
+                    <select id="eval_room" class="form-select">
+                      <option value="">暂无可选已入住房间</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="tiny-label">评分</label>
+                    <input id="score" type="number" min="1" max="5" class="form-control" placeholder="1 - 5">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="tiny-label">内容</label>
+                    <input id="content" class="form-control" placeholder="请填写评价或投诉内容">
+                  </div>
+                  <div class="col-12 d-grid mt-1">
+                    <button class="btn btn-primary btn-action-wide" onclick="submitComment()">提交评价 / 投诉</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="request-card">
+                <div class="request-card-head">
+                  <div>
+                    <div class="request-title">申请清洁</div>
+                  </div>
+                  <div class="request-badge request-badge-soft">服务请求</div>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="tiny-label">已入住房间号</label>
+                    <select id="clean_room" class="form-select">
+                      <option value="">暂无可选已入住房间</option>
+                    </select>
+                  </div>
+                  <div class="col-md-8">
+                    <label class="tiny-label">清洁说明</label>
+                    <input id="clean_content" class="form-control" placeholder="说明清洁情况">
+                  </div>
+                  <div class="col-12 d-grid mt-1">
+                    <button class="btn btn-outline-primary btn-action-wide" onclick="submitCleanRequest()">提交清洁申请</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="msg" class="msg-line mb-2 mt-3"></div>
+</div>
+
+<div id="reserveConfirmModal" class="reserve-modal d-none" aria-hidden="true">
+  <div class="reserve-modal-backdrop" data-close="1"></div>
+  <div class="reserve-modal-panel">
+    <div class="reserve-modal-header">
+      <h5 class="mb-0">确认预订信息</h5>
+      <button class="btn btn-sm btn-outline-secondary" onclick="hideReserveModal()">关闭</button>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-md-6"><input id="reserve_name" class="form-control" placeholder="预订姓名"></div>
+      <div class="col-md-6"><input id="reserve_phone" class="form-control" placeholder="预订手机号"></div>
+    </div>
+    <div id="reserveSummary" class="reserve-summary"></div>
+    <div class="reserve-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="hideReserveModal()">返回</button>
+      <button id="confirmReserveBtn" class="btn btn-success" onclick="confirmReserve()">确认下单</button>
+    </div>
+  </div>
+</div>
+
+<div id="successModal" class="reserve-modal d-none" aria-hidden="true">
+  <div class="reserve-modal-backdrop" data-close="1"></div>
+  <div class="reserve-modal-panel">
+    <div class="reserve-modal-header">
+      <h5 class="mb-0">消息</h5>
+      <button class="btn btn-sm btn-outline-secondary" onclick="hideSuccessModal()">关闭</button>
+    </div>
+    <div id="successModalBody" class="reserve-summary"></div>
+    <div class="reserve-modal-actions">
+      <button class="btn btn-primary" onclick="hideSuccessModal()">知道了</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastNotice" class="toast-notice d-none" aria-live="polite" aria-atomic="true">
+  <div id="toastNoticeText" class="toast-notice-text"></div>
+</div>
+
+<div id="cancelConfirmModal" class="reserve-modal d-none" aria-hidden="true">
+  <div class="reserve-modal-backdrop" data-close="1"></div>
+  <div class="reserve-modal-panel">
+    <div class="reserve-modal-header">
+      <h5 class="mb-0">确认取消订单</h5>
+      <button class="btn btn-sm btn-outline-secondary" onclick="hideCancelConfirmModal()">关闭</button>
+    </div>
+    <div id="cancelConfirmBody" class="reserve-summary"></div>
+    <div class="reserve-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="hideCancelConfirmModal()">返回</button>
+      <button class="btn btn-danger" onclick="confirmCancelOrder()">确认取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="changeRequestModal" class="reserve-modal d-none" aria-hidden="true">
+  <div class="reserve-modal-backdrop" data-close="1"></div>
+  <div class="reserve-modal-panel">
+    <div class="reserve-modal-header">
+      <h5 class="mb-0">提交换房申请</h5>
+      <button class="btn btn-sm btn-outline-secondary" onclick="hideChangeRequestModal()">关闭</button>
+    </div>
+    <div id="changeRequestBody" class="reserve-summary"></div>
+    <div class="row g-2 mt-1">
+      <div class="col-md-5"><input id="changeTargetRoom" class="form-control" placeholder="目标房间号"></div>
+      <div class="col-md-7"><input id="changeReason" class="form-control" placeholder="换房原因"></div>
+    </div>
+    <div class="reserve-modal-actions">
+      <button class="btn btn-outline-secondary" onclick="hideChangeRequestModal()">返回</button>
+      <button class="btn btn-warning" onclick="confirmChangeRequest()">提交换房申请</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const msgEl = document.getElementById("msg");
+let availableRooms = [];
+let pendingReserveRoom = null;
+let pendingCancelOrder = null;
+let pendingChangeOrder = null;
+let currentOrders = [];
+let toastTimer = null;
+
+function setMsg(text, type) {
+  msgEl.textContent = text || "";
+  msgEl.classList.remove("msg-success", "msg-danger");
+  msgEl.classList.add(type === "success" ? "msg-success" : "msg-danger");
+}
+
+function showToastNotice(message, type = "success") {
+  const box = document.getElementById("toastNotice");
+  const text = document.getElementById("toastNoticeText");
+  if (!box || !text) return;
+  text.textContent = message || "";
+  box.classList.remove("d-none", "toast-success", "toast-danger");
+  box.classList.add(type === "danger" ? "toast-danger" : "toast-success");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    box.classList.add("d-none");
+  }, 2200);
+}
+
+function showErrorNotice(message) {
+  showToastNotice(message, "danger");
+}
+function validPhone(v) { return /^\d{11}$/.test((v || "").replace(/\s+/g, "")); }
+function normalizePhone(v) { return (v || "").replace(/\s+/g, ""); }
+
+function chinaDateStr(offsetDays = 0) {
+  const now = new Date();
+  const chinaNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+  chinaNow.setHours(0, 0, 0, 0);
+  chinaNow.setDate(chinaNow.getDate() + offsetDays);
+  const y = chinaNow.getFullYear();
+  const m = String(chinaNow.getMonth() + 1).padStart(2, "0");
+  const d = String(chinaNow.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function todayStr() {
+  return chinaDateStr(0);
+}
+
+function tomorrowStr() {
+  return chinaDateStr(1);
+}
+
+function nightsBetween(checkin, checkout) {
+  return Math.max(1, Math.floor((new Date(checkout) - new Date(checkin)) / 86400000));
+}
+
+function applyDefaultDates() {
+  if (!document.getElementById("date").value) document.getElementById("date").value = todayStr();
+  if (!document.getElementById("checkout_date").value) document.getElementById("checkout_date").value = tomorrowStr();
+}
+
+function activatePanel(targetId) {
+  document.querySelectorAll(".drawer-nav-btn").forEach(b => b.classList.toggle("active", b.dataset.target === targetId));
+  document.querySelectorAll(".drawer-panel").forEach(p => p.classList.toggle("active", p.id === targetId));
+}
+
+function bindDrawer() {
+  const btns = document.querySelectorAll(".drawer-nav-btn");
+  btns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      activatePanel(btn.dataset.target);
+      if (btn.dataset.target === "panel-orders") renderOrders();
+    });
+  });
+}
+
+function validateDateRange(checkinId, checkoutId) {
+  const checkin = document.getElementById(checkinId).value;
+  const checkout = document.getElementById(checkoutId).value;
+  const today = todayStr();
+
+  if (!checkin || !checkout) {
+    showErrorNotice("入住日期和离店日期都必须填写");
+    return false;
+  }
+  if (checkin < today) {
+    showErrorNotice("入住日期不能早于今天");
+    return false;
+  }
+  if (checkout <= today) {
+    showErrorNotice("离店日期必须晚于今天");
+    return false;
+  }
+  if (checkout < checkin) {
+    showErrorNotice("离店日期不能早于预订日期");
+    return false;
+  }
+  return true;
+}
+
+function resetFilters() {
+  document.getElementById("room_id").value = "";
+  document.getElementById("room_type").value = "";
+  document.getElementById("price_max").value = "";
+  document.getElementById("area_min").value = "";
+  document.getElementById("date").value = todayStr();
+  document.getElementById("checkout_date").value = tomorrowStr();
+  queryRooms();
+}
+
+async function logout() {
+  await fetch("/api/logout", { method: "POST", credentials: "include" });
+  location.href = "/";
+}
+
+async function postJson(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (r.status === 401 || r.status === 403) {
+    location.href = "/";
+    return null;
+  }
+  return data;
+}
+
+function reserveIdentity() {
+  const name = document.getElementById("reserve_name").value.trim();
+  const phoneRaw = document.getElementById("reserve_phone").value;
+  const phone = normalizePhone(phoneRaw);
+  if (!name) {
+    showErrorNotice("请填写预订姓名");
+    return null;
+  }
+  if (!validPhone(phone)) {
+    showErrorNotice("预订手机号必须为11位数字");
+    return null;
+  }
+  return { name, phone };
+}
+
+let sessionCustomer = { name: "", phone: "", nickname: "" };
+
+async function loadSessionCustomer() {
+  try {
+    const r = await fetch("/api/current_user", { credentials: "include" });
+    const d = await r.json();
+    if (r.status === 401 || r.status === 403) {
+      location.href = "/";
+      return;
+    }
+    if (d && d.role === "customer") {
+      sessionCustomer = {
+        name: d.customer_name || d.username || "",
+        phone: d.customer_phone || "",
+        nickname: d.username || ""
+      };
+      const sourceEl = document.getElementById("comment_source");
+      if (sourceEl) sourceEl.textContent = sessionCustomer.nickname || "-";
+    }
+  } catch (_) {}
+}
+
+function populateRoomSelectors(rooms) {
+  const roomIdSel = document.getElementById("room_id");
+  const roomTypeSel = document.getElementById("room_type");
+
+  const roomIds = [...new Set(rooms.map(r => String(r.room_id)))].sort((a, b) => Number(a) - Number(b));
+  const roomTypes = [...new Set(rooms.map(r => r.room_type))].filter(Boolean).sort();
+
+  roomIdSel.innerHTML = '<option value="">全部房间</option>' + roomIds.map(v => `<option value="${v}">${v}</option>`).join("");
+  roomTypeSel.innerHTML = '<option value="">全部房型</option>' + roomTypes.map(v => `<option value="${v}">${v}</option>`).join("");
+}
+
+function populateCommentRoomOptions(list) {
+  const roomSels = [document.getElementById("eval_room"), document.getElementById("clean_room")].filter(Boolean);
+  if (!roomSels.length) return;
+  const occupiedRooms = [...new Map((Array.isArray(list) ? list : [])
+    .filter(o => String(o.status || "") === "已入住" && o.room_id !== null && o.room_id !== undefined)
+    .map(o => [String(o.room_id), String(o.room_id)])).values()]
+    .sort((a, b) => Number(a) - Number(b));
+
+  roomSels.forEach(roomSel => {
+    const prevValue = roomSel.value || "";
+    if (!occupiedRooms.length) {
+      roomSel.innerHTML = '<option value="">暂无可选已入住房间</option>';
+      roomSel.disabled = true;
+      return;
+    }
+    roomSel.disabled = false;
+    roomSel.innerHTML = '<option value="">请选择已入住房间号</option>' + occupiedRooms.map(v => `<option value="${v}">${v}</option>`).join("");
+    if (occupiedRooms.includes(prevValue)) {
+      roomSel.value = prevValue;
+    }
+  });
+}
+
+function renderRoomList(rooms) {
+  const listEl = document.getElementById("roomList");
+  const emptyEl = document.getElementById("roomEmpty");
+  if (!rooms.length) {
+    listEl.innerHTML = "";
+    emptyEl.classList.remove("d-none");
+    return;
+  }
+  emptyEl.classList.add("d-none");
+  listEl.innerHTML = rooms.map(r => `
+    <div class="room-row" data-room-id="${r.room_id}">
+      <div class="room-main">
+        <div class="room-title">房间 ${r.room_id} · ${r.room_type}</div>
+        <div class="room-meta">面积 ${r.area}㎡ · 价格 ¥${Number(r.price).toFixed(2)} / 晚 · ${r.status}</div>
+      </div>
+      <button class="btn btn-sm btn-success" onclick="openReserveModal(${r.room_id})">预订</button>
+    </div>
+  `).join("");
+}
+
+async function queryRooms() {
+  const body = {
+    room_id: document.getElementById("room_id").value,
+    room_type: document.getElementById("room_type").value,
+    status: "空闲",
+    price_max: document.getElementById("price_max").value,
+    area_min: document.getElementById("area_min").value,
+    checkin_date: document.getElementById("date").value,
+    checkout_date: document.getElementById("checkout_date").value
+  };
+  const r = await fetch("/api/query/rooms", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+  if (r.status === 401 || r.status === 403) {
+    location.href = "/";
+    return;
+  }
+  availableRooms = (data || []).filter(x => x.status === "空闲");
+  populateRoomSelectors(availableRooms);
+  renderRoomList(availableRooms);
+}
+
+function openReserveModal(roomId) {
+  if (!validateDateRange("date", "checkout_date")) return;
+
+  const checkin = document.getElementById("date").value;
+  const checkout = document.getElementById("checkout_date").value;
+  pendingReserveRoom = availableRooms.find(x => String(x.room_id) === String(roomId));
+  if (!pendingReserveRoom) {
+    showErrorNotice("房间数据已变化，请刷新后重试");
+    return;
+  }
+
+  const nights = nightsBetween(checkin, checkout);
+  const unit = Number(pendingReserveRoom.price);
+  const total = unit * nights;
+  const reserveName = document.getElementById("reserve_name").value.trim();
+  const reservePhone = normalizePhone(document.getElementById("reserve_phone").value);
+  document.getElementById("reserveSummary").innerHTML = `
+    <div><strong>客户：</strong>${reserveName || "（请填写）"}</div>
+    <div><strong>手机号：</strong>${reservePhone || "（请填写）"}</div>
+    <div><strong>房间：</strong>${pendingReserveRoom.room_id}</div>
+    <div><strong>房型：</strong>${pendingReserveRoom.room_type}</div>
+    <div><strong>面积：</strong>${pendingReserveRoom.area}㎡</div>
+    <div><strong>单价：</strong>¥${unit.toFixed(2)} / 晚</div>
+    <div><strong>入住：</strong>${checkin}</div>
+    <div><strong>离店：</strong>${checkout}</div>
+    <div><strong>晚数：</strong>${nights} 晚</div>
+    <div class="total-fee-line"><strong>总价：</strong>¥${total.toFixed(2)}</div>
+  `;
+
+  document.getElementById("reserveConfirmModal").classList.remove("d-none");
+}
+
+function hideReserveModal() {
+  document.getElementById("reserveConfirmModal").classList.add("d-none");
+}
+
+function showSuccessModal(title, message) {
+  const body = document.getElementById("successModalBody");
+  body.innerHTML = `
+    <div class="mb-2"><strong>${title || "提示"}</strong></div>
+    <div>${message || ""}</div>
+  `;
+  document.getElementById("successModal").classList.remove("d-none");
+}
+
+function hideSuccessModal() {
+  document.getElementById("successModal").classList.add("d-none");
+}
+
+function openCancelConfirmModal(order) {
+  pendingCancelOrder = order;
+  document.getElementById("cancelConfirmBody").innerHTML = `
+    <div class="mb-2"><strong>您确定要取消这笔订单吗？</strong></div>
+    <div class="order-grid">
+      <div>订单号：${order.res_id}</div>
+      <div>房间：${order.room_id} · ${order.room_type || "未知房型"}</div>
+      <div>入住：${order.checkin_date || ""}</div>
+      <div>离店：${order.checkout_date || ""}</div>
+      <div>状态：${order.status || ""}</div>
+    </div>
+    <div class="mt-2 text-danger">取消后该房间将重新进入空闲列表，请确认不是误操作。</div>
+  `;
+  document.getElementById("cancelConfirmModal").classList.remove("d-none");
+}
+
+function hideCancelConfirmModal() {
+  pendingCancelOrder = null;
+  document.getElementById("cancelConfirmModal").classList.add("d-none");
+}
+
+function openChangeRequestModal(order) {
+  pendingChangeOrder = order;
+  document.getElementById("changeTargetRoom").value = "";
+  document.getElementById("changeReason").value = "";
+  document.getElementById("changeRequestBody").innerHTML = `
+    <div class="mb-2"><strong>请填写换房申请信息</strong></div>
+    <div class="order-grid">
+      <div>订单号：${order.res_id}</div>
+      <div>当前房间：${order.room_id} · ${order.room_type || "未知房型"}</div>
+      <div>入住：${order.checkin_date || ""}</div>
+      <div>离店：${order.checkout_date || ""}</div>
+      <div>当前状态：${order.status || ""}</div>
+    </div>
+  `;
+  document.getElementById("changeRequestModal").classList.remove("d-none");
+}
+
+function hideChangeRequestModal() {
+  pendingChangeOrder = null;
+  document.getElementById("changeRequestModal").classList.add("d-none");
+}
+
+async function confirmChangeRequest() {
+  if (!pendingChangeOrder) return;
+  const target = (document.getElementById("changeTargetRoom").value || "").trim();
+  const reason = (document.getElementById("changeReason").value || "").trim();
+  if (!target) {
+    showErrorNotice("请填写目标房间号");
+    return;
+  }
+  const d = await postJson("/api/customer/request/change", {
+    name: sessionCustomer.name,
+    phone: sessionCustomer.phone,
+    room_id: pendingChangeOrder.room_id || "",
+    target_room_id: target,
+    content: reason || "换房申请"
+  });
+  if (!d) return;
+  hideChangeRequestModal();
+  if (d.success) {
+    showSuccessModal("换房申请已提交", d.message || "已提交换房申请，请等待处理。");
+  } else {
+    setMsg(d.message || "换房申请失败", "danger");
+  }
+}
+
+async function confirmCancelOrder() {
+  if (!pendingCancelOrder) return;
+  const order = pendingCancelOrder;
+  const d = await postJson("/api/reservation/cancel_by_res_id", {
+    res_id: order.res_id
+  });
+  if (!d) return;
+  hideCancelConfirmModal();
+  if (d.success) {
+    await renderOrders();
+    await queryRooms();
+    showSuccessModal("取消成功", d.message || `订单 ${order.res_id} 已取消。`);
+  } else {
+    setMsg(d.message || "取消失败", "danger");
+  }
+}
+
+async function confirmReserve() {
+  if (!pendingReserveRoom) return;
+  const identity = reserveIdentity();
+  if (!identity) return;
+  if (!validateDateRange("date", "checkout_date")) return;
+
+  const payload = {
+    name: identity.name,
+    phone: identity.phone,
+    room_id: pendingReserveRoom.room_id,
+    checkin_date: document.getElementById("date").value,
+    checkout_date: document.getElementById("checkout_date").value
+  };
+  const d = await postJson("/api/reservation", payload);
+  if (!d) return;
+  if (d.success) {
+    hideReserveModal();
+    pendingReserveRoom = null;
+    await queryRooms();
+    activatePanel("panel-orders");
+    await renderOrders();
+    showSuccessModal("预订成功", d.message || "订单已提交，请前往我的订单查看详情。");
+  } else {
+    setMsg(d.message || "预订失败", "danger");
+  }
+}
+
+async function fetchOrders() {
+  const d = await postJson("/api/customer/orders", {});
+  if (!d || !Array.isArray(d)) return [];
+  return d;
+}
+
+async function renderOrders() {
+  const list = await fetchOrders();
+  currentOrders = list;
+  const wrap = document.getElementById("orderList");
+  const empty = document.getElementById("orderEmpty");
+  populateCommentRoomOptions(list);
+  if (!list.length) {
+    wrap.innerHTML = "";
+    empty.classList.remove("d-none");
+    return;
+  }
+  empty.classList.add("d-none");
+  wrap.innerHTML = list.map(o => {
+    const canOperate = o.status === "已预订";
+    const nights = (o.checkin_date && o.checkout_date) ? nightsBetween(o.checkin_date, o.checkout_date) : 1;
+    const roomTotal = Number(o.price || 0) * nights;
+    return `
+      <div class="order-card" data-id="${o.res_id}" data-room="${o.room_id}">
+        <div class="order-head">
+          <div>
+            <div class="order-id">订单号：${o.res_id}</div>
+            <div class="order-meta">账户ID（昵称）：${o.account_nickname || "-"}</div>
+            <div class="order-meta">预订联系人：${o.reserve_name || ""} · ${o.reserve_phone || ""}</div>
+            <div class="order-meta">房间 ${o.room_id} · ${o.room_type || "未知房型"} · 状态：${o.status}</div>
+          </div>
+          <button class="btn btn-sm btn-outline-primary" data-action="toggle">查看详情</button>
+        </div>
+        <div class="order-detail d-none">
+          <div class="order-grid">
+            <div>订单编号：${o.res_id}</div>
+            <div>当前状态：${o.status || ""}</div>
+            <div>房间号：${o.room_id}</div>
+            <div>房型：${o.room_type || "未知房型"}</div>
+            <div>入住日期：${o.checkin_date || ""}</div>
+            <div>离店日期：${o.checkout_date || ""}</div>
+            <div>预计晚数：${nights} 晚</div>
+            <div>房费单价：¥${Number(o.price || 0).toFixed(2)} / 晚</div>
+            <div>房费合计：¥${roomTotal.toFixed(2)}</div>
+            <div>预订联系人：${o.reserve_name || ""}</div>
+            <div>联系电话：${o.reserve_phone || ""}</div>
+            <div>账户昵称：${o.account_nickname || "-"}</div>
+          </div>
+          ${canOperate ? `
+            <div class="order-actions">
+              <button class="btn btn-sm btn-danger" data-action="cancel">取消订单</button>
+              <button class="btn btn-sm btn-warning" data-action="toggle-change">换房申请</button>
+            </div>
+          ` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function bindOrderEvents() {
+  const wrap = document.getElementById("orderList");
+  wrap.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const card = e.target.closest(".order-card");
+    if (!card) return;
+    const action = btn.dataset.action;
+
+    if (action === "toggle") {
+      card.querySelector(".order-detail").classList.toggle("d-none");
+      return;
+    }
+
+    if (action === "toggle-change") {
+      const order = currentOrders.find(x => String(x.res_id) === String(card.dataset.id));
+      if (!order) return;
+      openChangeRequestModal(order);
+      return;
+    }
+
+    if (action === "cancel") {
+      const order = currentOrders.find(x => String(x.res_id) === String(card.dataset.id));
+      if (!order) return;
+      openCancelConfirmModal(order);
+      return;
+    }
+  });
+}
+
+async function submitComment() {
+  const identity = {
+    name: sessionCustomer.nickname || "",
+    phone: sessionCustomer.phone || ""
+  };
+  if (!identity.name || !validPhone(identity.phone)) {
+    showErrorNotice("当前账号昵称或手机号无效，无法提交评价/投诉");
+    setMsg("当前账号昵称或手机号无效，无法提交评价/投诉", "danger");
+    return;
+  }
+  const content = (document.getElementById("content").value || "").trim();
+  const roomId = (document.getElementById("eval_room").value || "").trim();
+  if (!roomId) {
+    showErrorNotice("请选择已入住房间号");
+    setMsg("请选择已入住房间号", "danger");
+    return;
+  }
+  if (!content) {
+    showErrorNotice("评价/投诉内容不能为空");
+    setMsg("评价/投诉内容不能为空", "danger");
+    return;
+  }
+  if (!identity) return;
+  const d = await postJson("/api/customer/request/comment", {
+    name: identity.name,
+    phone: identity.phone,
+    room_id: roomId,
+    score: document.getElementById("score").value,
+    content
+  });
+  if (!d) return;
+  showToastNotice(d.message || (d.success ? "提交成功" : "提交失败"), d.success ? "success" : "danger");
+  if (d.success) {
+    setMsg(d.message || "提交评价/投诉成功", "success");
+  } else {
+    setMsg(d.message || "提交评价/投诉失败", "danger");
+  }
+}
+
+async function submitCleanRequest() {
+  const roomId = (document.getElementById("clean_room").value || "").trim();
+  if (!roomId) {
+    showErrorNotice("清洁申请的房间号不能为空");
+    return;
+  }
+  const identity = {
+    name: sessionCustomer.nickname || "",
+    phone: sessionCustomer.phone || ""
+  };
+  if (!identity.name || !validPhone(identity.phone)) {
+    showErrorNotice("当前账号昵称或手机号无效，无法提交清洁申请");
+    setMsg("当前账号昵称或手机号无效，无法提交清洁申请", "danger");
+    return;
+  }
+  const d = await postJson("/api/customer/request/clean", {
+    name: identity.name,
+    phone: identity.phone,
+    room_id: roomId,
+    content: document.getElementById("clean_content").value || ""
+  });
+  if (!d) return;
+  showToastNotice(d.message || (d.success ? "提交成功" : "提交失败"), d.success ? "success" : "danger");
+  if (d.success) {
+    setMsg(d.message || "提交清洁申请成功", "success");
+  } else {
+    setMsg(d.message || "提交清洁申请失败", "danger");
+  }
+}
+
+document.getElementById("reserveConfirmModal").addEventListener("click", (e) => {
+  if (e.target && e.target.dataset.close === "1") hideReserveModal();
+});
+
+document.getElementById("successModal").addEventListener("click", (e) => {
+  if (e.target && e.target.dataset.close === "1") hideSuccessModal();
+});
+
+document.getElementById("cancelConfirmModal").addEventListener("click", (e) => {
+  if (e.target && e.target.dataset.close === "1") hideCancelConfirmModal();
+});
+
+document.getElementById("changeRequestModal").addEventListener("click", (e) => {
+  if (e.target && e.target.dataset.close === "1") hideChangeRequestModal();
+});
+
+applyDefaultDates();
+bindDrawer();
+bindOrderEvents();
+loadSessionCustomer().then(() => {
+  queryRooms();
+  renderOrders();
+});
+</script>
+</body>
+</html>
