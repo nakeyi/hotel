@@ -1,0 +1,50 @@
+{
+  "scriptCompleted": true,
+  "files": [
+    {
+      "path": ".gitattributes",
+      "language": "unknown",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".understand-anything/.understandignore",
+      "language": "unknown",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "flask_session/2029240f6d1128be89ddc32729463129",
+      "language": "unknown",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hotel_management_system.sql",
+      "language": "sql",
+      "sizeLines": 424,
+      "fileCategory": "data"
+    },
+    {
+      "path": "secret.key",
+      "language": "key",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 5,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "small",
+  "stats": {
+    "filesScanned": 5,
+    "byCategory": {
+      "code": 4,
+      "data": 1
+    },
+    "byLanguage": {
+      "unknown": 3,
+      "sql": 1,
+      "key": 1
+    }
+  }
+}
