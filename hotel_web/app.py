@@ -194,7 +194,7 @@ def add_security_headers(response):
     response.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; object-src 'none'; "
-        "form-action 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net data:; "
+        "form-action 'self'; connect-src 'self' https://cdn.jsdelivr.net https://rumt-zh.com; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net data:; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;"
     )
     return response
@@ -203,6 +203,11 @@ def add_security_headers(response):
 @app.route("/")
 def login_page():
     return render_template("login.html")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
 
 
 @app.route("/dashboard")

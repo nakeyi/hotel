@@ -1440,7 +1440,10 @@ def get_customer_orders(name, phone, account_nickname=None):
         return []
     account_nickname = str(account_nickname or "").strip()
     _, cur = _db()
-    cur.execute("SELECT cust_id, name, phone_encrypted FROM customer WHERE phone_encrypted IS NOT NULL")
+    cur.execute(
+        "SELECT cust_id, name, phone_encrypted FROM customer "
+        "WHERE phone_encrypted IS NOT NULL AND phone_encrypted<>''"
+    )
     target_cid = None
     for cid, cname, enc in cur.fetchall():
         try:
@@ -1529,6 +1532,12 @@ def get_customer_orders_by_cust_id(cust_id, account_nickname=None):
         return []
     account_nickname = str(account_nickname or "").strip()
     _, cur = _db()
+    cur.execute(
+        "SELECT 1 FROM customer WHERE cust_id=%s AND phone_encrypted IS NOT NULL AND phone_encrypted<>'' LIMIT 1",
+        (cid,),
+    )
+    if cur.fetchone() is None:
+        return []
     cur.execute(
         "SELECT r.res_id, r.room_id, rm.room_type, rm.price, r.checkin_date, r.checkout_date, r.status, "
         "IFNULL(r.reserve_name, c.name) AS reserve_name, r.reserve_phone_encrypted "
