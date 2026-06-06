@@ -1286,8 +1286,13 @@ def advanced_room_query(room_id, room_type, status, area_min, area_max, price_mi
     q_checkin = _parse_date_value(checkin_date)
     q_checkout = _parse_date_value(checkout_date)
     q_active_checkin = _parse_date_value(checkin_time)
-    active_rows = {row["room_id"]: row for row in _active_stay_rows(cur)}
-    occupied_room_ids = set(active_rows.keys())
+    need_active_details = bool(customer_name or customer_phone or q_active_checkin)
+    active_rows = {}
+    if need_active_details:
+        active_rows = {row["room_id"]: row for row in _active_stay_rows(cur)}
+    else:
+        cur.execute("SELECT DISTINCT room_id FROM checkin WHERE actual_checkout_time IS NULL")
+    occupied_room_ids = {row[0] for row in cur.fetchall()}
     reserved_room_ids = set()
     if q_checkin and q_checkout:
         cur.execute(
@@ -1309,7 +1314,7 @@ def advanced_room_query(room_id, room_type, status, area_min, area_max, price_mi
         if status and normalize_status(status) == ROOM_STATUS_FREE and final_status != ROOM_STATUS_FREE:
             continue
         active = active_rows.get(rid)
-        if customer_name or customer_phone or q_active_checkin:
+        if need_active_details:
             if not active:
                 continue
             if customer_name and customer_name not in str(active["customer"] or ""):
