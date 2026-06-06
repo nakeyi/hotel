@@ -1012,6 +1012,7 @@ def backup_sql():
 
 
 if __name__ == "__main__":
+    biz.ensure_performance_indexes()
     biz.ensure_service_request_table()
     app.run(host="0.0.0.0", port=5000, debug=True)
 

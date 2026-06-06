@@ -173,7 +173,7 @@ const tabs = [
 ];
 
 const $ = id => document.getElementById(id);
-const state = { current: tabs[0], roomOptions: [], roomTypeOptions: [] };
+const state = { current: tabs[0], roomOptions: [], roomTypeOptions: [], filtersLoaded: false };
 
 function buildTabs() {
   $("reportTabs").innerHTML = tabs.map(t => `<button class="front-tab-btn" data-tab="${t.key}">${t.label}</button>`).join("");
@@ -193,6 +193,9 @@ function syncTabs() {
 }
 
 async function loadRoomFilterOptions() {
+  if (state.filtersLoaded && state.roomOptions.length && state.roomTypeOptions.length) {
+    return true;
+  }
   const [roomsResp, typesResp] = await Promise.all([
     fetch("/api/rooms", { credentials: "include" }),
     fetch("/api/room_types", { credentials: "include" })
@@ -205,6 +208,7 @@ async function loadRoomFilterOptions() {
   const types = await typesResp.json();
   state.roomOptions = Array.from(new Set((rooms || []).map(r => String(r.room_id)))).filter(Boolean);
   state.roomTypeOptions = Array.from(new Set((types || []).map(t => String(t.name)))).filter(Boolean);
+  state.filtersLoaded = true;
   return true;
 }
 

@@ -34,6 +34,12 @@ def _db():
     return conn, conn.cursor()
 
 
+def _ensure_index(cur, table_name, index_name, create_sql):
+    cur.execute(f"SHOW INDEX FROM `{table_name}` WHERE Key_name=%s", (index_name,))
+    if cur.fetchone() is None:
+        cur.execute(create_sql)
+
+
 def normalize_status(status):
     s = str(status or "").strip()
     return STATUS_ALIASES.get(s, s)
@@ -153,6 +159,93 @@ def ensure_service_request_table():
         """
     )
     conn.commit()
+
+
+def _month_bounds(year_month):
+    ym = str(year_month or "").strip()
+    if not ym:
+        return None, None
+    try:
+        y, m = map(int, ym.split("-"))
+        start = datetime(y, m, 1)
+        if m == 12:
+            end = datetime(y + 1, 1, 1)
+        else:
+            end = datetime(y, m + 1, 1)
+        return start, end
+    except Exception:
+        return None, None
+
+
+def _day_bounds(date_value):
+    day = _parse_date_value(date_value)
+    if not day:
+        return None, None
+    start = datetime(day.year, day.month, day.day)
+    end = datetime(day.year, day.month, day.day, 23, 59, 59, 999999)
+    return start, end
+
+
+def ensure_performance_indexes():
+    conn, cur = _db()
+    changed = False
+    try:
+        _ensure_index(
+            cur,
+            "service_request",
+            "idx_service_request_created_at",
+            "CREATE INDEX idx_service_request_created_at ON service_request(created_at)",
+        )
+        changed = True
+    except Exception:
+        conn.rollback()
+        return
+    try:
+        _ensure_index(
+            cur,
+            "service_request",
+            "idx_service_request_status",
+            "CREATE INDEX idx_service_request_status ON service_request(status)",
+        )
+        changed = True
+    except Exception:
+        conn.rollback()
+        return
+    try:
+        _ensure_index(
+            cur,
+            "checkin",
+            "idx_checkin_checkin_time",
+            "CREATE INDEX idx_checkin_checkin_time ON checkin(checkin_time)",
+        )
+        changed = True
+    except Exception:
+        conn.rollback()
+        return
+    try:
+        _ensure_index(
+            cur,
+            "checkout",
+            "idx_checkout_checkout_time",
+            "CREATE INDEX idx_checkout_checkout_time ON checkout(checkout_time)",
+        )
+        changed = True
+    except Exception:
+        conn.rollback()
+        return
+    try:
+        _ensure_index(
+            cur,
+            "reservation",
+            "idx_reservation_checkin_date",
+            "CREATE INDEX idx_reservation_checkin_date ON reservation(checkin_date)",
+        )
+        changed = True
+    except Exception:
+        conn.rollback()
+        return
+    if changed:
+        conn.commit()
 
 
 
@@ -296,17 +389,28 @@ def _room_status_for_query(cur, room_id, room_status, checkin_date=None, checkou
     return ROOM_STATUS_FREE
 
 
-def _active_stay_rows():
-    _, cur = _db()
+def _active_stay_rows(cur=None):
+    own_cursor = False
+    if cur is None:
+        _, cur = _db()
+        own_cursor = True
     cur.execute(
         "SELECT c.room_id, c.checkin_id, cu.name, cu.phone_encrypted, c.checkin_time, c.operator, "
         "rm.room_type, rm.price, "
-        "(SELECT rr.res_id FROM reservation rr WHERE rr.cust_id=c.cust_id AND rr.room_id=c.room_id ORDER BY rr.res_id DESC LIMIT 1) AS res_id, "
-        "(SELECT rr.checkout_date FROM reservation rr WHERE rr.cust_id=c.cust_id AND rr.room_id=c.room_id ORDER BY rr.res_id DESC LIMIT 1) AS checkout_date, "
-        "(SELECT rr.status FROM reservation rr WHERE rr.cust_id=c.cust_id AND rr.room_id=c.room_id ORDER BY rr.res_id DESC LIMIT 1) AS res_status "
+        "r.res_id, r.checkout_date, r.status "
         "FROM checkin c "
         "JOIN customer cu ON c.cust_id=cu.cust_id "
         "JOIN room rm ON c.room_id=rm.room_id "
+        "LEFT JOIN ("
+        "    SELECT rr1.cust_id, rr1.room_id, rr1.res_id, rr1.checkout_date, rr1.status "
+        "    FROM reservation rr1 "
+        "    JOIN ("
+        "        SELECT cust_id, room_id, MAX(res_id) AS res_id "
+        "        FROM reservation "
+        "        WHERE status<>'已取消' "
+        "        GROUP BY cust_id, room_id"
+        "    ) latest ON latest.res_id = rr1.res_id"
+        ") r ON r.cust_id=c.cust_id AND r.room_id=c.room_id "
         "WHERE c.actual_checkout_time IS NULL "
         "ORDER BY c.checkin_time DESC"
     )
@@ -330,6 +434,11 @@ def _active_stay_rows():
             "checkout_date": checkout_date,
             "res_status": res_status or "已入住",
         })
+    if own_cursor:
+        try:
+            cur.close()
+        except Exception:
+            pass
     return rows
 def verify_user(username, password):
     _, cur = _db()
@@ -920,22 +1029,28 @@ def query_income_summary(year_month=None, date=None):
     ym = str(year_month or "").strip()
     day = _parse_date_value(date)
     if ym:
+        start, end = _month_bounds(ym)
+        if not start or not end:
+            return []
         cur.execute(
-            "SELECT DATE_FORMAT(checkout_time,'%%Y-%%m') AS period, IFNULL(SUM(total_fee),0) AS total_income, COUNT(*) AS checkout_count "
-            "FROM checkout WHERE DATE_FORMAT(checkout_time,'%%Y-%%m')=%s GROUP BY period",
-            (ym,),
+            "SELECT %s AS period, IFNULL(SUM(total_fee),0) AS total_income, COUNT(*) AS checkout_count "
+            "FROM checkout WHERE checkout_time>=%s AND checkout_time<%s",
+            (ym, start, end),
         )
         rows = cur.fetchall()
         return [(row[0], float(row[1] or 0), int(row[2] or 0)) for row in rows]
     if day:
         period = day.strftime("%Y-%m-%d")
+        start, end = _day_bounds(day)
+        if not start or not end:
+            return []
         cur.execute(
-            "SELECT DATE(checkout_time) AS period, IFNULL(SUM(total_fee),0) AS total_income, COUNT(*) AS checkout_count "
-            "FROM checkout WHERE DATE(checkout_time)=%s GROUP BY period",
-            (period,),
+            "SELECT %s AS period, IFNULL(SUM(total_fee),0) AS total_income, COUNT(*) AS checkout_count "
+            "FROM checkout WHERE checkout_time>=%s AND checkout_time<=%s",
+            (period, start, end),
         )
         rows = cur.fetchall()
-        return [(row[0].isoformat() if hasattr(row[0], "isoformat") else str(row[0]), float(row[1] or 0), int(row[2] or 0)) for row in rows]
+        return [(row[0], float(row[1] or 0), int(row[2] or 0)) for row in rows]
     cur.execute(
         "SELECT '全部' AS period, IFNULL(SUM(total_fee),0) AS total_income, COUNT(*) AS checkout_count "
         "FROM checkout"
@@ -962,7 +1077,7 @@ def query_reservation_records(name="", phone="", checkin_date=None):
     phone = normalize_phone(phone)
     q_checkin_date = _parse_date_value(checkin_date)
     _, cur = _db()
-    cur.execute(
+    sql = (
         "SELECT r.res_id, IFNULL(r.reserve_name, c.name), r.room_id, rm.room_type, rm.price, r.checkin_date, r.checkout_date, "
         "COALESCE(r.checkout_time, co.checkout_time) AS checkout_time, r.status, "
         "r.reserve_phone_encrypted, IFNULL(r.account_nickname, '') "
@@ -974,8 +1089,19 @@ def query_reservation_records(name="", phone="", checkin_date=None):
         "WHERE cc.cust_id=r.cust_id AND cc.room_id=r.room_id "
         "ORDER BY cc.checkout_time DESC LIMIT 1"
         ") "
-        "ORDER BY r.res_id DESC"
     )
+    where = []
+    params = []
+    if q_checkin_date:
+        where.append("r.checkin_date=%s")
+        params.append(q_checkin_date)
+    if name:
+        where.append("(IFNULL(r.reserve_name, c.name) LIKE %s OR c.name LIKE %s)")
+        params.extend([f"%{name}%", f"%{name}%"])
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY r.res_id DESC"
+    cur.execute(sql, params)
     out = []
     for row in cur.fetchall():
         res_id, customer, room_id, room_type, price, row_checkin_date, checkout_date, checkout_time, status, reserve_phone_enc, account_nickname = row
@@ -999,7 +1125,7 @@ def query_checkin_records(name="", phone="", checkin_date=None):
     phone = normalize_phone(phone)
     q_checkin_date = _parse_date_value(checkin_date)
     _, cur = _db()
-    cur.execute(
+    sql = (
         "SELECT c.checkin_id, c.cust_id, c.room_id, rm.room_type, rm.price, c.checkin_time, c.operator, "
         "COALESCE(c.operator_user_id, co.operator_user_id, u.user_id) AS operator_user_id, "
         "COALESCE(c.actual_checkout_time, co.checkout_time) AS actual_checkout_time, "
@@ -1018,8 +1144,21 @@ def query_checkin_records(name="", phone="", checkin_date=None):
         "ORDER BY rr.res_id DESC LIMIT 1"
         ") "
         "JOIN room rm ON c.room_id=rm.room_id "
-        "ORDER BY c.checkin_time DESC"
     )
+    where = []
+    params = []
+    if q_checkin_date:
+        start, end = _day_bounds(q_checkin_date)
+        if start and end:
+            where.append("c.checkin_time>=%s AND c.checkin_time<=%s")
+            params.extend([start, end])
+    if name:
+        where.append("(IFNULL(r.reserve_name, cu.name) LIKE %s OR cu.name LIKE %s)")
+        params.extend([f"%{name}%", f"%{name}%"])
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY c.checkin_time DESC"
+    cur.execute(sql, params)
     out = []
     for row in cur.fetchall():
         checkin_id, cust_id, room_id, room_type, price, checkin_time, operator, operator_user_id, actual_checkout_time, reserve_name, reserve_phone_enc = row
@@ -1045,15 +1184,28 @@ def query_checkout_records(name="", phone="", checkout_date=None):
     phone = normalize_phone(phone)
     q_checkout_date = _parse_date_value(checkout_date)
     _, cur = _db()
-    cur.execute(
+    sql = (
         "SELECT co.checkout_id, co.cust_id, co.room_id, rm.room_type, rm.price, co.checkin_date, co.checkout_time, co.total_fee, co.extra_fee, co.operator, co.operator_user_id, "
         "IFNULL(r.reserve_name, cu.name), r.reserve_phone_encrypted "
         "FROM checkout co "
         "JOIN customer cu ON co.cust_id=cu.cust_id "
         "LEFT JOIN reservation r ON r.cust_id=co.cust_id AND r.room_id=co.room_id "
         "JOIN room rm ON co.room_id=rm.room_id "
-        "ORDER BY co.checkout_time DESC"
     )
+    where = []
+    params = []
+    if q_checkout_date:
+        start, end = _day_bounds(q_checkout_date)
+        if start and end:
+            where.append("co.checkout_time>=%s AND co.checkout_time<=%s")
+            params.extend([start, end])
+    if name:
+        where.append("(IFNULL(r.reserve_name, cu.name) LIKE %s OR cu.name LIKE %s)")
+        params.extend([f"%{name}%", f"%{name}%"])
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY co.checkout_time DESC"
+    cur.execute(sql, params)
     out = []
     for row in cur.fetchall():
         checkout_id, cust_id, room_id, room_type, price, row_checkin_date, checkout_time, total_fee, extra_fee, operator, operator_user_id, reserve_name, reserve_phone_enc = row
@@ -1134,11 +1286,26 @@ def advanced_room_query(room_id, room_type, status, area_min, area_max, price_mi
     q_checkin = _parse_date_value(checkin_date)
     q_checkout = _parse_date_value(checkout_date)
     q_active_checkin = _parse_date_value(checkin_time)
-    active_rows = {row["room_id"]: row for row in _active_stay_rows()}
+    active_rows = {row["room_id"]: row for row in _active_stay_rows(cur)}
+    occupied_room_ids = set(active_rows.keys())
+    reserved_room_ids = set()
+    if q_checkin and q_checkout:
+        cur.execute(
+            "SELECT DISTINCT room_id FROM reservation "
+            "WHERE status IN (%s,%s) "
+            "AND checkin_date IS NOT NULL AND checkout_date IS NOT NULL "
+            "AND checkin_date < %s AND checkout_date > %s",
+            (ROOM_STATUS_RESERVED, ROOM_STATUS_OCCUPIED, q_checkout, q_checkin),
+        )
+        reserved_room_ids = {row[0] for row in cur.fetchall()}
     out = []
     for row in rows:
         rid, rtype, area, price, room_status = row
-        final_status = _room_status_for_query(cur, rid, room_status, q_checkin, q_checkout)
+        final_status = normalize_status(room_status)
+        if rid in occupied_room_ids:
+            final_status = ROOM_STATUS_OCCUPIED
+        elif rid in reserved_room_ids:
+            final_status = ROOM_STATUS_RESERVED
         if status and normalize_status(status) == ROOM_STATUS_FREE and final_status != ROOM_STATUS_FREE:
             continue
         active = active_rows.get(rid)
@@ -1227,19 +1394,22 @@ def get_reservation_records():
     return query_reservation_records()
 def get_statistics(year_month):
     _, cur = _db()
-    cur.execute("SELECT IFNULL(SUM(total_fee),0) FROM checkout WHERE DATE_FORMAT(checkout_time,'%%Y-%%m')=%s", (year_month,))
+    start, end = _month_bounds(year_month)
+    if not start or not end:
+        return 0.0, 0.0, "无"
+    cur.execute("SELECT IFNULL(SUM(total_fee),0) FROM checkout WHERE checkout_time>=%s AND checkout_time<%s", (start, end))
     income = float(cur.fetchone()[0] or 0)
     cur.execute("SELECT COUNT(*) FROM room")
     room_count = cur.fetchone()[0]
     y, m = map(int, year_month.split("-"))
     days = calendar.monthrange(y, m)[1]
-    cur.execute("SELECT COUNT(*) FROM checkin WHERE DATE_FORMAT(checkin_time,'%%Y-%%m')=%s", (year_month,))
+    cur.execute("SELECT COUNT(*) FROM checkin WHERE checkin_time>=%s AND checkin_time<%s", (start, end))
     checkins = cur.fetchone()[0]
     occupancy = (checkins / (room_count * days) * 100) if room_count and days else 0
     cur.execute(
         "SELECT r.room_type, COUNT(*) c FROM checkin c JOIN room r ON c.room_id=r.room_id "
-        "WHERE DATE_FORMAT(c.checkin_time,'%%Y-%%m')=%s GROUP BY r.room_type ORDER BY c DESC LIMIT 1",
-        (year_month,),
+        "WHERE c.checkin_time>=%s AND c.checkin_time<%s GROUP BY r.room_type ORDER BY c DESC LIMIT 1",
+        (start, end),
     )
     row = cur.fetchone()
     return income, occupancy, (row[0] if row else "无")
@@ -1265,7 +1435,7 @@ def get_customer_orders(name, phone, account_nickname=None):
         return []
     account_nickname = str(account_nickname or "").strip()
     _, cur = _db()
-    cur.execute("SELECT cust_id, name, phone_encrypted FROM customer")
+    cur.execute("SELECT cust_id, name, phone_encrypted FROM customer WHERE phone_encrypted IS NOT NULL")
     target_cid = None
     for cid, cname, enc in cur.fetchall():
         try:
@@ -1309,15 +1479,23 @@ def search_reservation_orders(name, phone):
         return []
     ensure_reservation_columns()
     _, cur = _db()
-    cur.execute(
+    sql = (
         "SELECT r.res_id, r.room_id, rm.room_type, rm.price, r.checkin_date, r.checkout_date, r.status, "
         "IFNULL(r.reserve_name, c.name) AS reserve_name, r.reserve_phone_encrypted, "
         "IFNULL(r.account_nickname, '') AS account_nickname, c.name AS customer_name "
         "FROM reservation r "
         "JOIN room rm ON r.room_id=rm.room_id "
         "JOIN customer c ON r.cust_id=c.cust_id "
-        "ORDER BY r.res_id DESC"
     )
+    where = []
+    params = []
+    if name:
+        where.append("(IFNULL(r.reserve_name, c.name) LIKE %s OR c.name LIKE %s)")
+        params.extend([f"%{name}%", f"%{name}%"])
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY r.res_id DESC"
+    cur.execute(sql, params)
     out = []
     for row in cur.fetchall():
         row = list(row)
@@ -1416,7 +1594,7 @@ def list_service_requests():
     _, cur = _db()
     cur.execute(
         "SELECT request_id, request_type, customer_name, customer_phone, room_id, target_room_id, score, content, status, "
-        "handler, response, created_at, handled_at FROM service_request ORDER BY created_at DESC"
+        "handler, response, created_at, handled_at FROM service_request ORDER BY created_at DESC LIMIT 500"
     )
     out = []
     for row in cur.fetchall():

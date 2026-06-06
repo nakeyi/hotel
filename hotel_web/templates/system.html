@@ -200,6 +200,10 @@
 const $ = id => document.getElementById(id);
 let roomCache = [];
 let roomTypeCache = [];
+let usersCache = "";
+let customersCache = "";
+let logsCache = "";
+let cachePrimed = false;
 const systemTabs = [
   ["users", "员工管理"],
   ["rooms", "客房管理"],
@@ -234,6 +238,7 @@ async function addUser() {
     body: JSON.stringify({ username: u.value, password: p.value, role: r.value })
   });
   msg.textContent = d.message || "";
+  usersCache = "";
   loadUsers();
 }
 
@@ -260,6 +265,7 @@ async function updateUser() {
     body: JSON.stringify({ username: edit_u.value, role: edit_r.value })
   });
   msg.textContent = d.message || "";
+  usersCache = "";
   loadUsers();
 }
 
@@ -272,12 +278,17 @@ function fillEdit(id, username, role) {
 async function delUser(id) {
   const d = await req("/api/users/" + id, { method: "DELETE" });
   msg.textContent = d.message || "";
+  usersCache = "";
   loadUsers();
 }
 
 async function loadUsers() {
+  if (usersCache) {
+    tb.innerHTML = usersCache;
+    return;
+  }
   const d = await req("/api/users");
-  tb.innerHTML = (d || []).map(x => `
+  usersCache = (d || []).map(x => `
     <tr>
       <td>${x.user_id}</td>
       <td>${x.username}</td>
@@ -289,11 +300,17 @@ async function loadUsers() {
       </td>
     </tr>
   `).join("");
+  tb.innerHTML = usersCache;
 }
 
 async function loadCustomers() {
+  if (customersCache) {
+    ctb.innerHTML = customersCache;
+    return;
+  }
   const d = await req("/api/customers");
-  ctb.innerHTML = (d || []).map(x => `<tr><td>${x.cust_id}</td><td>${x.name}</td><td>${x.phone}</td></tr>`).join("");
+  customersCache = (d || []).map(x => `<tr><td>${x.cust_id}</td><td>${x.name}</td><td>${x.phone}</td></tr>`).join("");
+  ctb.innerHTML = customersCache;
 }
 
 async function price() {
@@ -307,6 +324,7 @@ async function price() {
     body: JSON.stringify({ room_id: pr.value, price: pp.value })
   });
   msg.textContent = d.message || "";
+  roomCache = [];
   loadRooms();
 }
 
@@ -321,6 +339,7 @@ async function addRoom() {
     body: JSON.stringify({ room_id: nr.value, room_type: nt.value, area: na.value, price: np.value })
   });
   msg.textContent = d.message || "";
+  roomCache = [];
   loadRooms();
 }
 
@@ -331,10 +350,16 @@ async function addType() {
     body: JSON.stringify({ name: tn.value, price: tp.value })
   });
   msg.textContent = d.message || "";
+  roomTypeCache = [];
   loadTypes();
 }
 
 async function loadTypes() {
+  if (roomTypeCache.length && $("types")) {
+    types.innerHTML = roomTypeCache.map(x => `<tr><td>${x.name || ""}</td><td>${Number(x.price || 0).toFixed(2)}</td></tr>`).join("");
+    fillRoomSelects();
+    return;
+  }
   const d = await req("/api/room_types");
   roomTypeCache = Array.isArray(d) ? d.map(x => ({ name: x.name, price: x.price })) : [];
   if ($("types")) {
@@ -344,13 +369,22 @@ async function loadTypes() {
 }
 
 async function loadLogs() {
+  if (logsCache) {
+    logs.innerHTML = logsCache;
+    return;
+  }
   const d = await req("/api/logs");
   if ($("logs")) {
-    logs.innerHTML = (d || []).map(x => `<tr><td>${x.log_time || ""}</td><td>${x.operator || ""}</td><td>${x.operation_type || ""}</td><td>${x.detail || ""}</td></tr>`).join("");
+    logsCache = (d || []).map(x => `<tr><td>${x.log_time || ""}</td><td>${x.operator || ""}</td><td>${x.operation_type || ""}</td><td>${x.detail || ""}</td></tr>`).join("");
+    logs.innerHTML = logsCache;
   }
 }
 
 async function loadRooms() {
+  if (roomCache.length) {
+    fillRoomSelects();
+    return;
+  }
   const d = await req("/api/rooms");
   roomCache = Array.isArray(d) ? d.map(x => ({
     room_id: x.room_id,
@@ -391,6 +425,7 @@ loadCustomers();
 loadTypes();
 loadLogs();
 loadRooms();
+cachePrimed = true;
 buildSystemTabs();
 
 if (new URLSearchParams(location.search).get("embed") === "1") {

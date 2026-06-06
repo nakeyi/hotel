@@ -164,6 +164,7 @@ adminMenuEl.innerHTML = (menuGroup.admin || []).map((m, i) =>
 
 const frame = document.getElementById("contentFrame");
 const welcome = document.getElementById("welcome");
+let currentFrameUrl = "";
 
 function activate(btn) {
   document.querySelectorAll(".menu-btn").forEach(b => b.classList.remove("active"));
@@ -171,9 +172,14 @@ function activate(btn) {
 }
 
 function loadInRight(url) {
+  const nextUrl = `${url}${url.includes("?") ? "&" : "?"}embed=1`;
+  if (currentFrameUrl === nextUrl) {
+    return;
+  }
+  currentFrameUrl = nextUrl;
   welcome.classList.add("d-none");
   frame.classList.remove("d-none");
-  frame.src = `${url}${url.includes("?") ? "&" : "?"}embed=1&ts=${Date.now()}`;
+  frame.src = nextUrl;
 }
 
 document.querySelectorAll(".menu-btn").forEach(btn => {

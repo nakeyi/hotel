@@ -99,6 +99,7 @@
 const $ = id => document.getElementById(id);
 const setMsg = t => $("msg").textContent = t || "";
 let currentUser = null;
+let currentUserLoaded = false;
 const maintenanceTypeByStatus = {
   "维护中": "维护",
   "清洁中": "清洁"
@@ -241,7 +242,10 @@ async function confirmIdle(roomId, status) {
 }
 
 async function init() {
-  currentUser = await get("/api/current_user");
+  if (!currentUserLoaded) {
+    currentUser = await get("/api/current_user");
+    currentUserLoaded = true;
+  }
   if (!currentUser) return;
   await loadRooms();
 }
